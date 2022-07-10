@@ -1,0 +1,143 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 
+// Design Name: 
+// Module Name: proNet
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+`include "defs.v"
+module proNet #(parameter C_S_AXI_DATA_WIDTH=32,C_S_AXI_ADDR_WIDTH=5)(
+    input clk,
+    input reset_n,
+    //axis stream interface
+    input [`DATA_WIDTH-1:0] axis_data_in,
+    input axis_data_in_valid,
+    output axis_data_in_ready,
+    //AXI lite interface
+	input [C_S_AXI_ADDR_WIDTH-1 : 0] s_axi_awaddr,
+	// Write channel Protection type. This signal indicates the
+    // privilege and security level of the transaction, and whether
+    // the transaction is a data access or an instruction access.
+	input wire [2 : 0] s_axi_awprot,
+	// Write address valid. This signal indicates that the master signaling
+   	// valid write address and control information.
+	input wire  s_axi_awvalid,
+	// Write address ready. This signal indicates that the slave is ready
+   	// to accept an address and associated control signals.
+	output wire  s_axi_awready,
+	// Write data (issued by master, acceped by Slave) 
+	input wire [C_S_AXI_DATA_WIDTH-1 : 0] s_axi_wdata,
+	// Write strobes. This signal indicates which byte lanes hold
+    // valid data. There is one write strobe bit for each eight
+   	// bits of the write data bus.    
+	input wire [(C_S_AXI_DATA_WIDTH/8)-1 : 0] s_axi_wstrb,
+	// Write valid. This signal indicates that valid write
+    // data and strobes are available.
+	input wire  s_axi_wvalid,
+	// Write ready. This signal indicates that the slave
+    // can accept the write data.
+	output wire  s_axi_wready,
+	// Write response. This signal indicates the status
+    // of the write transaction.
+	output wire [1 : 0] s_axi_bresp,
+	// Write response valid. This signal indicates that the channel
+   	// is signaling a valid write response.
+	output wire  s_axi_bvalid,
+	// Response ready. This signal indicates that the master
+   	// can accept a write response.
+	input wire  s_axi_bready,
+	// Read address (issued by master, acceped by Slave)
+	input wire [C_S_AXI_ADDR_WIDTH-1 : 0] s_axi_araddr,
+	// Protection type. This signal indicates the privilege
+   	// and security level of the transaction, and whether the
+   	// transaction is a data access or an instruction access.
+	input wire [2 : 0] s_axi_arprot,
+	// Read address valid. This signal indicates that the channel
+   	// is signaling valid read address and control information.
+	input wire  s_axi_arvalid,
+	// Read address ready. This signal indicates that the slave is
+    // ready to accept an address and associated control signals.
+	output wire  s_axi_arready,
+	// Read data (issued by slave)
+	output wire [C_S_AXI_DATA_WIDTH-1 : 0] s_axi_rdata,
+    // Read response. This signal indicates the status of the
+    // read transfer.
+	output wire [1 : 0] s_axi_rresp,
+	// Read valid. This signal indicates that the channel is
+    // signaling the required read data.
+	output wire  s_axi_rvalid,
+	// Read ready. This signal indicates that the master can
+    // accept the read data and response information.
+	input wire  s_axi_rready,
+	// Interrupt interface
+	output wire intr
+);
+    localparam IDLE='d0,
+    SEND='d1;
+    
+    wire [31:0]  config_layer_id;
+    wire [31:0]  config_neuron_id;
+    wire [31:0] weight_value;
+    wire [31:0] bias_value;
+    wire weight_valid;
+    wire bias_valid;
+    wire axi_rd_en;
+    wire [31:0] axi_rd_data;
+    wire soft_reset;
+    wire [31:0] max_finder_data_out;
+    wire max_finder_data_out_valid;
+///
+    assign axis_data_in_ready=1;
+    assign intr = max_finder_data_out_valid;
+    assign runtime_reset_n = reset_n && !soft_reset;
+///
+axi_lite_wrapper # ( 
+    .C_S_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
+    .C_S_AXI_ADDR_WIDTH(C_S_AXI_ADDR_WIDTH)) axi_lite_wrapper_inst 
+(
+    .S_AXI_ACLK(clk),
+    .S_AXI_ARESETN(reset_n),
+    .S_AXI_AWADDR(s_axi_awaddr),
+    .S_AXI_AWPROT(s_axi_awprot),
+    .S_AXI_AWVALID(s_axi_awvalid),
+    .S_AXI_AWREADY(s_axi_awready),
+    .S_AXI_WDATA(s_axi_wdata),
+    .S_AXI_WSTRB(s_axi_wstrb),
+    .S_AXI_WVALID(s_axi_wvalid),
+    .S_AXI_WREADY(s_axi_wready),
+    .S_AXI_BRESP(s_axi_bresp),
+    .S_AXI_BVALID(s_axi_bvalid),
+    .S_AXI_BREADY(s_axi_bready),
+    .S_AXI_ARADDR(s_axi_araddr),
+    .S_AXI_ARPROT(s_axi_arprot),
+    .S_AXI_ARVALID(s_axi_arvalid),
+    .S_AXI_ARREADY(s_axi_arready),
+    .S_AXI_RDATA(s_axi_rdata),
+    .S_AXI_RRESP(s_axi_rresp),
+    .S_AXI_RVALID(s_axi_rvalid),
+    .S_AXI_RREADY(s_axi_rready),
+    .layer_id(config_layer_id),
+    .neuron_id(config_neuron_id),
+    .weight_value(weight_value),
+    .weight_valid(weight_valid),
+    .bias_valid(bias_valid),
+    .bias_value(bias_value),
+    .nn_data_valid(max_finder_data_out_valid),
+    .nn_data(max_finder_data_out),
+    .axi_rd_en(axi_rd_en),
+    .axi_rd_data(axi_rd_data),
+    .soft_reset(soft_reset)
+);
